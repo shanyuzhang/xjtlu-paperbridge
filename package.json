@@ -1,0 +1,41 @@
+{
+  "name": "xjtlu-paperbridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PaperBridge: personal past-paper search and PDF downloads over local MCP.",
+  "type": "module",
+  "bin": {
+    "paperbridge": "bin/paperbridge.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/paperbridge.js",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "Shanyu Zhang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shanyuzhang/xjtlu-paperbridge.git"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE",
+    "package-lock.json"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "html-to-text": "^10.0.1",
+    "playwright-core": "^1.63.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "unpdf": "^1.8.1"
+  }
+}

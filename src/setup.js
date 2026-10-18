@@ -1,0 +1,88 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { DATA_DIR } from './config.js';
+import { upsertHarnessPatch } from './harness.js';
+
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const ID = 'paperbridge';
+const toml = (s) => JSON.stringify(s);
+
+export function launchConfig(root = ROOT) { return { command: process.execPath, args: [path.join(root, 'bin', 'paperbridge.js'), 'serve'] }; }
+
+export function upsertCodexToml(text, launch) {
+  const section = `[mcp_servers.${ID}]\ncommand = ${toml(launch.command)}\nargs = ${JSON.stringify(launch.args)}\n`;
+  const re = /^\[mcp_servers\.paperbridge(?:\.[^\]]+)?\][^\n]*\n(?:(?!\[)[^\n]*\n?)*/gm;
+  return text.replace(re, '').trimEnd() + `\n\n${section}`;
+}
+
+export function targets(home = os.homedir(), platform = process.platform, { env = process.env, onPath = (cmd) => sh(cmd, ['--version']).status === 0 } = {}) {
+  const desktop = platform === 'darwin' ? path.join(home, 'Library', 'Application Support', 'Claude')
+    : platform === 'win32' ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Claude') : path.join(home, '.config', 'Claude');
+  // Kimi Code CLI 读 ~/.kimi-code/mcp.json（可用 KIMI_CODE_HOME 改位置）；旧版 kimi-cli 读 ~/.kimi/mcp.json。
+  const kimiHome = env.KIMI_CODE_HOME || path.join(home, '.kimi-code');
+  const kimi = fs.existsSync(kimiHome) || !fs.existsSync(path.join(home, '.kimi')) ? kimiHome : path.join(home, '.kimi');
+  const harness = env.DSH_HOME || path.join(home, '.dsh');
+  return [
+    // Claude Code 的用户级配置由它自己的命令维护（与参考仓库相同），不直接改 ~/.claude.json。
+    { id: 'claude-code', name: 'Claude Code', file: 'claude mcp add --scope user', detect: () => onPath('claude'), format: 'claude-cli' },
+    { id: 'kimi-code', name: 'Kimi Code', file: path.join(kimi, 'mcp.json'), detect: kimi, format: 'json' },
+    { id: 'deepseek-harness', name: 'DeepSeek Harness', file: path.join(harness, 'cordis.patch.yml'), detect: () => fs.existsSync(harness) || onPath('dsh'), format: 'harness' },
+    { id: 'codex', name: 'Codex', file: path.join(home, '.codex', 'config.toml'), detect: path.join(home, '.codex'), format: 'toml' },
+    { id: 'claude-desktop', name: 'Claude Desktop', file: path.join(desktop, 'claude_desktop_config.json'), detect: desktop, format: 'json' },
+    { id: 'cursor', name: 'Cursor', file: path.join(home, '.cursor', 'mcp.json'), detect: path.join(home, '.cursor'), format: 'json' },
+    { id: 'windsurf', name: 'Windsurf', file: path.join(home, '.codeium', 'windsurf', 'mcp_config.json'), detect: path.join(home, '.codeium', 'windsurf'), format: 'json' },
+  ].filter((t) => (typeof t.detect === 'function' ? t.detect() : fs.existsSync(t.detect)));
+}
+
+export function installTarget(target, launch) {
+  if (target.format === 'claude-cli') {
+    sh('claude', ['mcp', 'remove', '--scope', 'user', ID]);
+    const r = sh('claude', ['mcp', 'add', '--scope', 'user', ID, '--', launch.command, ...launch.args]);
+    if (r.status !== 0) throw new Error('claude mcp add 失败，请确认 Claude Code 可以正常运行。');
+    return { file: target.file, backup: null };
+  }
+  const prior = fs.existsSync(target.file) ? fs.readFileSync(target.file, 'utf8') : '';
+  let next;
+  if (target.format === 'toml') next = upsertCodexToml(prior, launch);
+  else if (target.format === 'harness') next = upsertHarnessPatch(prior, launch);
+  else {
+    let config;
+    try { config = prior.trim() ? JSON.parse(prior) : {}; }
+    catch { throw new Error(`${target.file} 不是有效 JSON，未修改。`); }
+    if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('客户端配置必须是 JSON 对象。');
+    config.mcpServers = { ...config.mcpServers, [ID]: launch };
+    next = JSON.stringify(config, null, 2) + '\n';
+  }
+  if (next === prior) return { file: target.file, backup: null };
+  const backup = `${target.file}.before-paperbridge-${Date.now()}.bak`;
+  if (fs.existsSync(target.file)) {
+    fs.copyFileSync(target.file, backup, fs.constants.COPYFILE_EXCL);
+    fs.chmodSync(backup, 0o600);
+  }
+  fs.mkdirSync(path.dirname(target.file), { recursive: true });
+  fs.writeFileSync(target.file, next, { mode: 0o600 });
+  return { file: target.file, backup: prior ? backup : null };
+}
+
+// npm 在 Windows 上是 .cmd 包装脚本，Node 只能通过 shell 启动；shell 只接受一整条命令行，
+// 所以与 src/setup.js 相同：每个参数加引号后拼接（参考仓库提交 60065e6）。
+const q = (a) => (process.platform === 'win32' ? `"${String(a).replace(/"/g, '""')}"` : `'${String(a).replace(/'/g, "'\\''")}'`);
+const sh = (cmd, args, opts = {}) => spawnSync([cmd, ...args.map(q)].join(' '), { shell: true, ...opts });
+
+export function stableInstall(log = () => {}) {
+  const root = path.join(DATA_DIR, 'app');
+  if (path.resolve(ROOT) === path.resolve(root)) return launchConfig(root);
+  fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+  for (const name of ['src', 'bin', 'package.json', 'package-lock.json', 'LICENSE', 'README.md']) {
+    const source = path.join(ROOT, name);
+    if (fs.existsSync(source)) fs.cpSync(source, path.join(root, name), { recursive: true });
+  }
+  log('正在安装运行依赖到独立的本地目录…');
+  const args = ['ci', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts'];
+  const result = sh('npm', args, { cwd: root, stdio: 'inherit' });
+  if (result.status !== 0) throw new Error('依赖安装失败，请检查 Node.js、npm 和网络后重试。');
+  return launchConfig(root);
+}
