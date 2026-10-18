@@ -8,6 +8,22 @@
 
 需要 Node.js 20+、Chrome 或 Edge，以及能运行本地 stdio MCP 的 AI 客户端。先安装并打开一次 Codex 或 DeepSeek Harness。
 
+在终端粘贴这一行，按提示选择要连接的客户端，并在弹出的窗口完成学校登录：
+
+```bash
+npx -y xjtlu-paperbridge@latest setup
+```
+
+如果让 AI 代为安装，使用下面这一行，只接入检测到的 Codex / Harness。安装后重启客户端，再由本人完成试卷库登录：
+
+```bash
+npx -y xjtlu-paperbridge@latest setup --yes --clients codex,deepseek-harness --no-login
+```
+
+安装器将程序放到 `~/.paperbridge/app`，修改前备份客户端配置，保留其他 MCP 服务。npm 包只含程序和说明，不包含会话或试卷。升级时重新运行同一行命令，再重启 AI 客户端即可。
+
+也可以从 GitHub 安装源码：
+
 ```bash
 git clone https://github.com/shanyuzhang/xjtlu-paperbridge.git
 cd xjtlu-paperbridge
@@ -15,13 +31,20 @@ npm ci --ignore-scripts
 node bin/paperbridge.js setup --yes --clients codex,deepseek-harness --no-login
 ```
 
-安装器只接入检测到的选定客户端，将程序放到 `~/.paperbridge/app`，修改前备份配置；不会替换其他 MCP 服务。`package.json` 设置了 `private: true`，本项目不发布到 npm。
-
 完全退出并重开 AI 客户端，问「帮我找 FIN104 的历年试卷，区分正考和补考，下载我选的那份」。首次使用，工具会提示本人登录。
 
 升级时，在仓库目录运行 `git pull --ff-only`、`npm ci --ignore-scripts`，再运行相同的 setup 命令，最后重启 AI 客户端。
 
 ## 本人登录
+
+安装后也可以直接运行：
+
+```bash
+npx -y xjtlu-paperbridge@latest login
+npx -y xjtlu-paperbridge@latest status
+```
+
+源码目录内使用：
 
 ```bash
 node bin/paperbridge.js login

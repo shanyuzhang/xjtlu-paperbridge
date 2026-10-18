@@ -1,7 +1,6 @@
 {
   "name": "xjtlu-paperbridge",
   "version": "0.1.0",
-  "private": true,
   "description": "PaperBridge: personal past-paper search and PDF downloads over local MCP.",
   "type": "module",
   "bin": {
@@ -10,7 +9,9 @@
   "scripts": {
     "test": "node --test",
     "start": "node bin/paperbridge.js",
-    "verify:live": "node scripts/verify-live.mjs"
+    "verify:live": "node scripts/verify-live.mjs",
+    "prepack": "node -e \"require('fs').copyFileSync('package-lock.json','npm-shrinkwrap.json')\"",
+    "postpack": "node -e \"require('fs').rmSync('npm-shrinkwrap.json',{force:true})\""
   },
   "engines": {
     "node": ">=20"
@@ -26,8 +27,12 @@
     "src",
     "README.md",
     "LICENSE",
-    "package-lock.json"
+    "npm-shrinkwrap.json"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",
     "html-to-text": "^10.0.1",
