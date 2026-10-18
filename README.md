@@ -81,13 +81,17 @@ node bin/paperbridge.js status
 
 ## MCP 工具
 
+直接对 AI 说「下载 FIN104 的试卷到当前文件夹」，会保存到本次对话打开的项目下，例如 `你的项目/FIN104/试卷.pdf`。也可以说「保存到桌面的期末复习文件夹」。AI 不知道当前项目路径时，会先询问保存位置；下载完成后会给出实际文件路径。
+
+下载工具必须传入绝对路径 `download_dir`，不会再自动回退到 Documents。切换项目时，每次使用当前对话的项目目录；安装 PaperBridge 的位置不影响保存位置。升级后需完全退出并重新打开 AI 客户端，以刷新工具参数。
+
 | 工具 | 用途 |
 | --- | --- |
 | `paperbridge_status` | 检查本人会话及登录进度 |
 | `paperbridge_login` | 打开本人专用登录窗口，立即返回 |
 | `paperbridge_search` | 按 `course_code` 检索，返回记录 ID 和 `next_page` |
 | `paperbridge_details` | 按 `record_ids` 读取学年、学期、正考 / 补考类型 |
-| `paperbridge_download` | 按检索记录 ID 保存 PDF，一次最多 20 份 |
+| `paperbridge_download` | 按 `record_ids` 保存到 `download_dir/<课程代码>/`，一次最多 20 份 |
 
 有下一页时继续检索。相同标题可能对应正考和补考，选择前应读取详情。下载只处理当前账号有阅读权限的学校 PDF，检查文件头和结束标记，限制 60 MB；相同内容去重，不覆盖同名不同内容。工具只返回元数据和本地路径，不返回试卷正文或临时签名 URL。
 
@@ -96,11 +100,20 @@ node bin/paperbridge.js status
 ## 本地文件与配置
 
 - 会话和配置：`~/.paperbridge/`，含 `session.json`、`login-browser/` 和 `config.json`。
-- 默认 PDF：`~/Documents/PaperBridge/<课程代码>/`。
-- `PAPERBRIDGE_HOME` 覆盖数据目录；`PAPERBRIDGE_DOWNLOADS` 或 `--downloads <目录>` 覆盖下载目录。
+- AI 下载：本次对话的项目目录，或用户指定目录，其下按课程代码归档。
+- 命令行下载：默认当前命令运行目录；已有自选目录配置或 `PAPERBRIDGE_DOWNLOADS` 时使用该默认值。`download --downloads <目录>` 只指定本次保存位置，不更改后续下载。
+- `setup --downloads <目录>` 设置命令行默认目录；AI 下载始终以本次传入的 `download_dir` 为准。
+- `PAPERBRIDGE_HOME` 覆盖数据目录。
 - `PAPERBRIDGE_BROWSER` 可指定 `chrome`、`msedge` 或 `chromium`。默认查找系统 Chrome / Edge。
 
 学校会话属于敏感信息。仓库不包含本人会话、浏览器配置、PDF、`.env` 或任何真实凭据；安装后也不自动读取其他程序的会话。每位使用者须自行确认学校条款及资料使用范围，不要公开转发下载的试卷。
+
+命令行示例，先检索取得 ID，再下载（将 `<记录ID>` 替换为检索结果）：
+
+```bash
+npx -y xjtlu-paperbridge@latest download <记录ID>
+npx -y xjtlu-paperbridge@latest download <记录ID> --downloads "/absolute/path/期末复习"
+```
 
 ## 手动接入
 
@@ -137,5 +150,7 @@ node scripts/verify-live.mjs --course-code FIN104
 2026-10-18，PaperBridge 0.1.0 在 macOS 上通过 17 项自动测试；Codex CLI 和 DeepSeek Harness 均通过独立的 `paperbridge_*` 工具完成 FIN104 检索（6 条）、详情及 PDF 下载。独立解析确认所选试卷为 426316 字节、6 页。Windows / Linux 尚未真机验证。协议或学校接口变化后可能需要更新；保存的会话过期时，状态检查会要求本人重新登录。
 
 0.1.1 增加一键安装脚本，自动测试共 21 项。macOS 已实际验证从没有系统 Node 的环境下载、校验并使用独立 Node，带空格的安装路径也能启动 5 个 MCP 工具。Windows 脚本已检查 UTF-8 包装与固定校验值，尚未在 Windows 真机验证。
+
+0.1.2 支持按当前项目或自选文件夹下载，MCP 下载必须提供绝对保存路径，命令行默认当前目录。24 项自动测试通过，覆盖中文和空格目录、不同目标的并发下载、缺少目录时拒绝请求，以及单次路径设置不修改默认配置。本次真实 Codex 验证在学校会话过期处停止，未重新进行真实试卷下载。
 
 MIT 许可，保留复用代码的作者信息，见 [LICENSE](LICENSE)。

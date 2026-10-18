@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { z } from 'zod';
 
 export const EXAM_TOOLS = [
@@ -7,8 +8,8 @@ export const EXAM_TOOLS = [
     input: { course_code: z.string().min(3).max(20), page: z.number().int().min(1).max(100).optional(), page_size: z.number().int().min(1).max(100).optional() }, run: (c, a) => c.search(a.course_code, a) },
   { name: 'paperbridge_details', description: '读取检索得到的试卷详情，返回学年、学期和考试类型（Final 正考 / Resit 补考），一次最多 20 份。用于区分同年同名的试卷，不读取题目正文。',
     input: { record_ids: z.array(z.string().regex(/^\d{1,20}$/)).min(1).max(20) }, run: (c, a) => c.details(a.record_ids) },
-  { name: 'paperbridge_download', localWrite: true, description: '将检索结果中选定的试卷 PDF 保存到本人电脑，按课程代码归档。record_ids 必须来自 paperbridge_search，一次最多 20 份，按顺序下载并校验 PDF；不返回 Cookie、token 或临时签名链接。',
-    input: { record_ids: z.array(z.string().regex(/^\d{1,20}$/)).min(1).max(20) }, run: (c, a) => c.save(a.record_ids) },
+  { name: 'paperbridge_download', localWrite: true, description: '将选定试卷 PDF 保存到 download_dir/<课程代码>/。download_dir 必填，使用用户明确指定的文件夹，否则使用本次对话当前打开的项目文件夹的绝对路径；不知道当前项目路径时先询问用户保存到哪里，不猜测 Documents、主目录或 MCP 程序目录。record_ids 必须来自 paperbridge_search，一次最多 20 份。下载后向用户显示 saved 中的实际文件路径；不返回 Cookie、token 或临时签名链接。',
+    input: { record_ids: z.array(z.string().regex(/^\d{1,20}$/)).min(1).max(20), download_dir: z.string().min(1).refine((value) => path.isAbsolute(value) && !value.includes('\0'), '请提供保存目录的绝对路径。').describe('本次下载的绝对保存目录。优先用户指定目录，其次当前对话的项目文件夹；无法确定时先询问用户。') }, run: (c, a) => c.save(a.record_ids, { downloadDir: a.download_dir }) },
 ];
 
 export async function invokeExamTool(client, name, args = {}) {
@@ -23,6 +24,8 @@ export function registerExamTools(server, client) {
     annotations: { readOnlyHint: !tool.localWrite, destructiveHint: false, openWorldHint: true },
   }, async (args) => {
     try { return { content: [{ type: 'text', text: JSON.stringify(await invokeExamTool(client, tool.name, args), null, 1) }] }; }
-    catch (e) { return { isError: true, content: [{ type: 'text', text: e.name === 'ZodError' ? '试卷参数不正确。' : e.message }] }; }
+    catch (e) { return { isError: true, content: [{ type: 'text', text: e.name === 'ZodError'
+      ? tool.name === 'paperbridge_download' ? '试卷参数不正确。下载时必须提供 download_dir：用户指定目录或当前项目文件夹的绝对路径；不确定时先询问用户。' : '试卷参数不正确。'
+      : e.message }] }; }
   });
 }

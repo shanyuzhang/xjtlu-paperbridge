@@ -161,23 +161,25 @@ export class ExamClient {
     return { items, failed, unprocessed: recordIds.slice(items.length + failed.length) };
   }
 
-  async save(recordIds) {
+  async save(recordIds, { downloadDir = this.downloads } = {}) {
     if (!Array.isArray(recordIds) || !recordIds.length || recordIds.length > 20) throw new Error('每次请选择 1–20 份试卷。');
     recordIds = [...new Set(recordIds.map(id))];
+    if (typeof downloadDir !== 'string' || !path.isAbsolute(downloadDir) || downloadDir.includes('\0')) throw new Error('请提供保存目录的绝对路径。');
+    const directory = path.resolve(downloadDir);
     const task = this.queue.then(async () => {
       const db = await this.database(); const saved = []; const failed = [];
       for (const recordId of recordIds) {
-        try { saved.push(await this.saveOne(recordId, db)); }
+        try { saved.push(await this.saveOne(recordId, db, directory)); }
         catch (e) { failed.push({ record_id: recordId, error: e.message }); if (e.code === 'LOGIN_REQUIRED') break; }
       }
-      return { saved, failed, processed: saved.length + failed.length, requested: recordIds.length,
+      return { download_directory: directory, saved, failed, processed: saved.length + failed.length, requested: recordIds.length,
         unprocessed: recordIds.slice(saved.length + failed.length) };
     });
     this.queue = task.catch(() => {});
     return task;
   }
 
-  async saveOne(recordId, db) {
+  async saveOne(recordId, db, downloadDir) {
     const { query, info, flag } = await this.detail(recordId, db);
     // flag=0 is a valid reader flag; use the same BrowserUrl flow as View Online.
     const urls = await this.json(`/api/v1/file/BrowserUrl/${flag}?${query}`);
@@ -194,7 +196,7 @@ export class ExamClient {
       throw new Error('学校没有返回完整 PDF（可能登录过期或无阅读权限），未保存文件。');
     }
     const code = courseCode(info.course_code);
-    const directory = path.join(this.downloads, code);
+    const directory = path.join(downloadDir, code);
     const name = `${code}_${safeName(info.year).slice(0, 12)}_${safeName(info.title).slice(0, 50)}_${recordId}.pdf`;
     const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });

@@ -4,9 +4,32 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { upsertCodexToml } from '../src/setup.js';
+
+test('CLI defaults to the caller folder and a one-off destination does not overwrite saved preferences', (t) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'paperbridge-destination-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const env = { ...process.env, PAPERBRIDGE_HOME: path.join(home, 'state') };
+  delete env.PAPERBRIDGE_DOWNLOADS;
+  const configUrl = new URL('../src/config.js', import.meta.url).href;
+  const readSettings = () => spawnSync(process.execPath, ['--input-type=module', '-e', `import {settings} from ${JSON.stringify(configUrl)}; console.log(JSON.stringify(settings()));`], { cwd: home, env, encoding: 'utf8' });
+  const initial = readSettings(); assert.equal(initial.status, 0);
+  assert.equal(JSON.parse(initial.stdout).downloads, fs.realpathSync(home));
+  fs.mkdirSync(env.PAPERBRIDGE_HOME);
+  const configFile = path.join(env.PAPERBRIDGE_HOME, 'config.json');
+  const saved = JSON.stringify({ downloads: path.join(home, 'chosen default') });
+  fs.writeFileSync(configFile, saved);
+  assert.equal(JSON.parse(readSettings().stdout).downloads, path.join(home, 'chosen default'));
+  const cli = fileURLToPath(new URL('../bin/paperbridge.js', import.meta.url));
+  const result = spawnSync(process.execPath, [cli, 'download', 'invalid-id', '--downloads', './one-off'], { cwd: home, env, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /试卷 ID/);
+  assert.equal(fs.readFileSync(configFile, 'utf8'), saved);
+  assert.equal(fs.existsSync(path.join(home, 'one-off')), false);
+});
 
 test('Codex configuration preserves course assistant and replaces only PaperBridge', () => {
   const prior = '[mcp_servers.xjtlu-core]\ncommand="course-node"\n[mcp_servers.paperbridge]\ncommand="old"\n[mcp_servers.paperbridge.env]\nOLD="value"\n[mcp_servers.other]\ncommand="other-node"\n';

@@ -29,5 +29,5 @@ export function secureJson(file, value) {
 export function configure(patch) { secureJson(CONFIG_FILE, { ...readConfig(), ...patch }); }
 
 export function settings() {
-  return { downloads: path.resolve(process.env.PAPERBRIDGE_DOWNLOADS || readConfig().downloads || path.join(os.homedir(), 'Documents', 'PaperBridge')) };
+  return { downloads: path.resolve(process.env.PAPERBRIDGE_DOWNLOADS || readConfig().downloads || process.cwd()) };
 }

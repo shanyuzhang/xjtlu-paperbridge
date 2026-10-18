@@ -64,6 +64,28 @@ test('explicit denied reader rights are not followed by a file request', async (
   assert.ok(!requests.slice(before).some((r) => /BrowserUrl|BrowserFile/.test(r.path)));
 });
 
+test('per-download directories stay isolated across queued calls and preserve the default', async () => {
+  const client = make();
+  const destinations = [path.join(home, '课程项目 A'), path.join(home, 'other project')];
+  const results = await Promise.all(destinations.map((downloadDir) => client.save(['101'], { downloadDir })));
+  for (const [index, result] of results.entries()) {
+    assert.equal(result.download_directory, destinations[index]);
+    assert.equal(path.dirname(result.saved[0].path), path.join(destinations[index], 'MTH129'));
+    assert.deepEqual(fs.readFileSync(result.saved[0].path), pdf);
+  }
+  assert.equal(client.downloads, path.join(home, 'papers'));
+  assert.equal((await client.save(['101'])).download_directory, client.downloads);
+});
+
+test('MCP requires an explicit absolute destination before any school request', async () => {
+  const before = requests.length;
+  for (const download_dir of [undefined, '', 'relative-folder', '~/Documents', '/tmp/invalid\0path']) {
+    await assert.rejects(invokeExamTool(make(), 'paperbridge_download', { record_ids: ['101'], ...(download_dir === undefined ? {} : { download_dir }) }));
+  }
+  await assert.rejects(make().save(['101'], { downloadDir: 'relative-folder' }), /绝对路径/);
+  assert.equal(requests.length, before);
+});
+
 test('details distinguish exam type and semester using school metadata', async () => {
   const result = await make().details(['101', '102']);
   assert.equal(result.items[0].exam_type, 'Final'); assert.equal(result.items[0].semester, 'S1');
@@ -156,7 +178,12 @@ test('real MCP transport lists exam tools and returns search/details/download re
     assert.equal(JSON.parse(search.content[0].text).items[0].record_id, '101');
     const details = await client.callTool({ name: 'paperbridge_details', arguments: { record_ids: ['101'] } });
     assert.equal(JSON.parse(details.content[0].text).items[0].exam_type, 'Final');
-    const download = await client.callTool({ name: 'paperbridge_download', arguments: { record_ids: ['101'] } });
-    assert.equal(JSON.parse(download.content[0].text).saved.length, 1);
+    const missing = await client.callTool({ name: 'paperbridge_download', arguments: { record_ids: ['101'] } });
+    assert.equal(missing.isError, true);
+    const directory = path.join(home, 'mcp project');
+    const download = await client.callTool({ name: 'paperbridge_download', arguments: { record_ids: ['101'], download_dir: directory } });
+    const result = JSON.parse(download.content[0].text);
+    assert.equal(result.saved.length, 1);
+    assert.equal(path.dirname(result.saved[0].path), path.join(directory, 'MTH129'));
   } finally { await client.close(); await server.close(); }
 });

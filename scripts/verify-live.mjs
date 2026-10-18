@@ -32,7 +32,7 @@ try {
   if (!selected) throw new Error('未找到可验证的匹配试卷。');
   const metadata = await call('paperbridge_details', { record_ids: [selected.record_id] });
   if (!metadata.items.length) throw new Error(metadata.failed[0]?.error || '无法读取试卷详情。');
-  const result = await call('paperbridge_download', { record_ids: [selected.record_id] });
+  const result = await call('paperbridge_download', { record_ids: [selected.record_id], download_dir: process.cwd() });
   if (!result.saved.length) throw new Error(result.failed[0]?.error || '未保存文件。');
   const saved = result.saved[0];
   const pdf = await getDocumentProxy(new Uint8Array(fs.readFileSync(saved.path)));
