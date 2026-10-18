@@ -1,6 +1,6 @@
 {
   "name": "xjtlu-paperbridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PaperBridge: personal past-paper search and PDF downloads over local MCP.",
   "type": "module",
   "bin": {
@@ -10,8 +10,9 @@
     "test": "node --test",
     "start": "node bin/paperbridge.js",
     "verify:live": "node scripts/verify-live.mjs",
-    "prepack": "node -e \"require('fs').copyFileSync('package-lock.json','npm-shrinkwrap.json')\"",
-    "postpack": "node -e \"require('fs').rmSync('npm-shrinkwrap.json',{force:true})\""
+    "prepack": "node scripts/build-bootstrap.mjs && node -e \"require('fs').copyFileSync('package-lock.json','npm-shrinkwrap.json')\"",
+    "postpack": "node -e \"require('fs').rmSync('npm-shrinkwrap.json',{force:true})\"",
+    "build:bootstrap": "node scripts/build-bootstrap.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -27,7 +28,10 @@
     "src",
     "README.md",
     "LICENSE",
-    "npm-shrinkwrap.json"
+    "npm-shrinkwrap.json",
+    "install.sh",
+    "install.ps1",
+    "scripts/bootstrap"
   ],
   "publishConfig": {
     "access": "public",

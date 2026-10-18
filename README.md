@@ -6,9 +6,29 @@
 
 ## 安装
 
-需要 Node.js 20+、Chrome 或 Edge，以及能运行本地 stdio MCP 的 AI 客户端。先安装并打开一次 Codex 或 DeepSeek Harness。
+先安装并打开一次 Codex 或 DeepSeek Harness，并准备 Chrome 或 Edge。下面的一键脚本会自动处理 Node.js，无需提前安装 Node、Git 或 Python。
 
-在终端粘贴这一行，按提示选择要连接的客户端，并在弹出的窗口完成学校登录：
+**macOS / Linux**，打开终端，粘贴：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/shanyuzhang/xjtlu-paperbridge/main/install.sh)"
+```
+
+**Windows**，打开 PowerShell，粘贴：
+
+```powershell
+irm https://raw.githubusercontent.com/shanyuzhang/xjtlu-paperbridge/main/install.ps1 | iex
+```
+
+脚本会检测 Node.js 20+；缺少时下载 Node 24 LTS，使用固定的官方 SHA-256 校验，安装到 `~/.paperbridge/node`，不改系统 Node 或系统 PATH，也不需要管理员权限。随后安装 PaperBridge，自动接入检测到的 Codex / Harness，并打开学校登录窗口。
+
+由本人登录、进入 Past Exam Papers、确认协议并搜索一次课程代码后，窗口会自动关闭。完全退出并重新打开 AI 客户端，就可以问「帮我找 FIN104 的历年试卷」。重新运行相同命令即可更新。
+
+Windows 发布脚本采用 ASCII 包装，避免 PowerShell 5.1 解码中文乱码；[可读源码](scripts/bootstrap/install.ps1) 与 [macOS / Linux 脚本](install.sh) 均在仓库中。没有浏览器或 AI 客户端时会提示先安装，不会自动创建账号或接受学校协议。
+
+### 已有 Node.js 的安装方式
+
+如果已经有 Node.js 20+，也可以直接使用 npm：
 
 ```bash
 npx -y xjtlu-paperbridge@latest setup
@@ -21,6 +41,10 @@ npx -y xjtlu-paperbridge@latest setup --yes --clients codex,deepseek-harness --n
 ```
 
 安装器将程序放到 `~/.paperbridge/app`，修改前备份客户端配置，保留其他 MCP 服务。npm 包只含程序和说明，不包含会话或试卷。升级时重新运行同一行命令，再重启 AI 客户端即可。
+
+AI 在没有 Node 的电脑上代装时，可在运行脚本前设置 `PAPERBRIDGE_NO_LOGIN=1`，先完成安装和配置；后续通过 AI 的登录工具由本人连接试卷库。脚本不会要求在终端输入学校密码。
+
+可用 `PAPERBRIDGE_CLIENTS=codex` 或 `PAPERBRIDGE_CLIENTS=deepseek-harness` 只连接其中一个；默认连接检测到的两者。
 
 也可以从 GitHub 安装源码：
 
@@ -37,7 +61,7 @@ node bin/paperbridge.js setup --yes --clients codex,deepseek-harness --no-login
 
 ## 本人登录
 
-安装后也可以直接运行：
+使用一键脚本安装后，可直接让 AI 调用 `paperbridge_login`。已有系统 Node / npx 时也可以运行：
 
 ```bash
 npx -y xjtlu-paperbridge@latest login
@@ -111,5 +135,7 @@ node scripts/verify-live.mjs --course-code FIN104
 自动测试使用本地假学校接口及真实 MCP transport，验证检索、权限拒绝、PDF 保存、去重、独立登录和配置合并。真实验证命令需要本人登录，并会保存一份选定试卷及检查 PDF 页数。它不打印会话或题目正文。
 
 2026-10-18，PaperBridge 0.1.0 在 macOS 上通过 17 项自动测试；Codex CLI 和 DeepSeek Harness 均通过独立的 `paperbridge_*` 工具完成 FIN104 检索（6 条）、详情及 PDF 下载。独立解析确认所选试卷为 426316 字节、6 页。Windows / Linux 尚未真机验证。协议或学校接口变化后可能需要更新；保存的会话过期时，状态检查会要求本人重新登录。
+
+0.1.1 增加一键安装脚本，自动测试共 21 项。macOS 已实际验证从没有系统 Node 的环境下载、校验并使用独立 Node，带空格的安装路径也能启动 5 个 MCP 工具。Windows 脚本已检查 UTF-8 包装与固定校验值，尚未在 Windows 真机验证。
 
 MIT 许可，保留复用代码的作者信息，见 [LICENSE](LICENSE)。
