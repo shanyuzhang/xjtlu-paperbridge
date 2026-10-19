@@ -20,7 +20,7 @@
 irm https://raw.githubusercontent.com/shanyuzhang/xjtlu-paperbridge/main/install.ps1 | iex
 ```
 
-脚本会检测 Node.js 20+；缺少时下载 Node 24 LTS，使用固定的官方 SHA-256 校验，安装到 `~/.paperbridge/node`，不改系统 Node 或系统 PATH，也不需要管理员权限。随后安装 PaperBridge，自动接入检测到的 Codex / Harness，并打开学校登录窗口。
+脚本会检测 Node.js 20+；缺少时下载 Node 24 LTS，使用固定的官方 SHA-256 校验，安装到 `~/.paperbridge/node`，不改系统 Node 或系统 PATH，也不需要管理员权限。随后安装 PaperBridge，自动接入检测到的 Codex / Harness，并打开学校登录窗口。所有安装方式均默认有哪个就接入哪个，无需逐个确认；修改已有配置前仍会自动备份。
 
 由本人登录、进入 Past Exam Papers、确认协议并搜索一次课程代码后，窗口会自动关闭。完全退出并重新打开 AI 客户端，就可以问「帮我找 FIN104 的历年试卷」。重新运行相同命令即可更新。
 
@@ -34,10 +34,10 @@ Windows 发布脚本采用 ASCII 包装，避免 PowerShell 5.1 解码中文乱�
 npx -y xjtlu-paperbridge@latest setup
 ```
 
-如果让 AI 代为安装，使用下面这一行，只接入检测到的 Codex / Harness。安装后重启客户端，再由本人完成试卷库登录：
+如果让 AI 代为安装，使用下面这一行，自动接入检测到的 Codex / Harness。安装后重启客户端，再由本人完成试卷库登录：
 
 ```bash
-npx -y xjtlu-paperbridge@latest setup --yes --clients codex,deepseek-harness --no-login
+npx -y xjtlu-paperbridge@latest setup --no-login
 ```
 
 安装器将程序放到 `~/.paperbridge/app`，修改前备份客户端配置，保留其他 MCP 服务。npm 包只含程序和说明，不包含会话或试卷。升级时重新运行同一行命令，再重启 AI 客户端即可。
@@ -152,5 +152,7 @@ node scripts/verify-live.mjs --course-code FIN104
 0.1.1 增加一键安装脚本，自动测试共 21 项。macOS 已实际验证从没有系统 Node 的环境下载、校验并使用独立 Node，带空格的安装路径也能启动 5 个 MCP 工具。Windows 脚本已检查 UTF-8 包装与固定校验值，尚未在 Windows 真机验证。
 
 0.1.2 支持按当前项目或自选文件夹下载，MCP 下载必须提供绝对保存路径，命令行默认当前目录。24 项自动测试通过，覆盖中文和空格目录、不同目标的并发下载、缺少目录时拒绝请求，以及单次路径设置不修改默认配置。本次真实 Codex 验证在学校会话过期处停止，未重新进行真实试卷下载。
+
+0.1.3 将直接运行 `setup` 也改为自动接入检测到的 Codex / Harness，无需逐个确认，已有配置仍在修改前自动备份。可用 `--clients` 限定客户端，旧的 `--yes` 命令继续兼容。28 项自动测试通过。
 
 MIT 许可，保留复用代码的作者信息，见 [LICENSE](LICENSE)。
